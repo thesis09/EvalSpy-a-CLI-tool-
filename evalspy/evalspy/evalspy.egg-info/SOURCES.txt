@@ -1,0 +1,14 @@
+README.md
+setup.py
+evalspy/__init__.py
+evalspy/cli.py
+evalspy/live.py
+evalspy/reporter.py
+evalspy.egg-info/PKG-INFO
+evalspy.egg-info/SOURCES.txt
+evalspy.egg-info/dependency_links.txt
+evalspy.egg-info/entry_points.txt
+evalspy.egg-info/top_level.txt
+evalspy/checks/__init__.py
+evalspy/checks/base.py
+evalspy/checks/static.py
