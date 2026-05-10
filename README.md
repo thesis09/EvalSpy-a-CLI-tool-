@@ -1,0 +1,151 @@
+# EvalSpy
+
+> Audit your LLM benchmark evaluation pipeline for known failure modes **before** you waste compute running 164 problems.
+
+```
+$ evalspy check my_eval.py
+
+  EvalSpy — LLM Evaluation Pipeline Auditor
+  ──────────────────────────────────────────────────────
+  Script: my_eval.py
+  Mode:   static only
+
+  RESULTS
+  ──────────────────────────────────────────────────────
+  ✗  Assembly logic [CRITICAL]
+     Unconditional fn_prompt prepending detected.
+     │ When the model returns a complete function, prepending fn_prompt
+     │ creates a duplicate 'def' block. Python silently uses the second
+     │ (empty) definition. Every test fails.
+     │ This produced 0% HumanEval in real evaluation runs.
+     Fix:
+       Add a guard: if function_name already in model response,
+       use response directly. Otherwise prepend stub.
+
+  ✗  MBPP name injection [CRITICAL]
+     MBPP evaluation missing function name handling.
+     │ MBPP tests hardcode the expected function name.
+     │ Without injecting it, model picks its own → NameError every test.
+     │ This produced 9% pass@1 in real evaluation runs.
+     Fix:
+       re.search(r'assert\s+([a-zA-Z_]\w*)\s*\(', test)
+       f'Write a function named `{func_name}` ...'
+
+  ✓  Subprocess timeout
+  ✓  Stop token config
+  ✓  Tokenizer artifact check
+  –  DebugBench field names (not detected)
+
+  ──────────────────────────────────────────────────────
+  SUMMARY
+  2 critical issue(s): Assembly logic, MBPP name injection
+    These will produce wrong benchmark scores.
+
+  3 passed  2 failed  1 skipped
+```
+
+---
+
+## Why this exists
+
+When building [Forge](https://huggingface.co/KK9922/Forge-Gemma-3-27B-GGUF), a QLoRA fine-tune of Gemma 3 27B, I hit four evaluation pipeline failures that produced completely wrong benchmark scores:
+
+| Bug | Score before fix | Score after fix |
+|---|---|---|
+| Duplicate function assembly | 0% HumanEval | 98.78% |
+| Missing MBPP name injection | 9% MBPP | 71% |
+| DebugBench field name mismatch | 0 training samples | 4,253 samples |
+| GGUF tokenizer corruption | Silent variable drops | Clean output |
+
+None of these were model failures. All of them were evaluation pipeline failures.
+
+EvalSpy catches them in 3 seconds, before you run 164 problems.
+
+---
+
+## Install
+
+```bash
+pip install evalspy
+```
+
+Or from source:
+```bash
+git clone https://github.com/thesis09/evalspy
+cd evalspy
+pip install -e .
+```
+
+**Zero dependencies.** Pure Python stdlib.
+
+---
+
+## Usage
+
+# Try it immediately on the included examples
+evalspy check examples/broken_eval.py --verbose   # catches CRITICAL bug on line 345
+evalspy check examples/fixed_eval.py --verbose    # shows clean pipeline
+
+
+mkdir -p evalspy/examples
+cp /home/beast095/Desktop/SLM_e2e/eval/evaluate_h100_v2.py evalspy/examples/broken_eval.py
+cp /home/beast095/Desktop/SLM_e2e/eval/evaluate_h100_v4.py evalspy/examples/fixed_eval.py
+
+### Static analysis (3 seconds, no model needed)
+```bash
+evalspy check my_eval.py
+evalspy check my_eval.py --verbose          # full detail on all failures
+```
+
+### Live mode (runs 3 sample problems against your actual model)
+```bash
+# Start your model server first
+python main.py --model gemma3-forge-Q4_K_M.gguf
+
+# Then run evalspy with --live
+evalspy check my_eval.py --live
+evalspy check my_eval.py --live --server http://localhost:8080
+```
+
+### CI integration (exit code 1 on critical failures)
+```bash
+evalspy check my_eval.py --json
+# Returns JSON + exits 1 if any CRITICAL check fails
+```
+
+### List all checks
+```bash
+evalspy list
+```
+
+---
+
+## Checks
+
+| Check | Severity | What it catches |
+|---|---|---|
+| Assembly logic | CRITICAL | Duplicate `def` blocks → 0% HumanEval |
+| MBPP name injection | CRITICAL | Missing function name → NameError → 9% MBPP |
+| MBPP builtin guard | WARNING | `set` collision → 2 wrong failures |
+| Subprocess timeout | WARNING | Infinite loops hanging benchmark |
+| Stop token config | WARNING | Model generating past function boundary |
+| Tokenizer artifacts | CRITICAL | GGUF variable name corruption patterns |
+| DebugBench fields | CRITICAL | `fixed_code` vs `solution` field mismatch |
+| Temperature setting | INFO | High temperature causing non-deterministic scores |
+| Dataset assertions | WARNING | Silent 0-sample dataset loads |
+| Live model check | CRITICAL | Runtime failures static analysis can't catch |
+
+---
+
+## What I'd add with more time
+
+- Support for HumanEval+, SWE-bench, APPS benchmark patterns
+- Auto-fix mode that patches detected issues in your eval script
+- GitHub Action for automatic eval pipeline validation on PR
+- Pattern library contributions from the community (known benchmark gotchas)
+
+---
+
+## License
+
+MIT — Kaustubh Kubitkar
