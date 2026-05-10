@@ -86,15 +86,14 @@ pip install -e .
 evalspy check examples/broken_eval.py --verbose   # catches CRITICAL bug on line 345
 evalspy check examples/fixed_eval.py --verbose    # shows clean pipeline
 
-
-mkdir -p evalspy/examples
-cp /home/beast095/Desktop/SLM_e2e/eval/evaluate_h100_v2.py evalspy/examples/broken_eval.py
-cp /home/beast095/Desktop/SLM_e2e/eval/evaluate_h100_v4.py evalspy/examples/fixed_eval.py
-
 ### Static analysis (3 seconds, no model needed)
 ```bash
 evalspy check my_eval.py
 evalspy check my_eval.py --verbose          # full detail on all failures
+
+mkdir -p evalspy/examples
+cp /home/beast095/Desktop/SLM_e2e/eval/evaluate_h100_v2.py evalspy/examples/broken_eval.py
+cp /home/beast095/Desktop/SLM_e2e/eval/evaluate_h100_v4.py evalspy/examples/fixed_eval.py
 ```
 
 ### Live mode (runs 3 sample problems against your actual model)
